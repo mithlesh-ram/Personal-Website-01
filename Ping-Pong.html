@@ -1,1 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ping Pong Game</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+            font-family: Arial, sans-serif;
+            color: white;
+            text-align: center;
+        }
+        canvas {
+            display: block;
+            background-color: #111;
+            margin: 0 auto;
+        }
+        #startScreen, #gameOverScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            z-index: 10;
+        }
+        #startScreen h1, #gameOverScreen h1 {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+        #startScreen p, #gameOverScreen p {
+            font-size: 22px;
+            margin: 10px 0;
+            max-width: 600px;
+            line-height: 1.5;
+        }
+        #scoreDisplay {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 28px;
+            font-weight: bold;
+            z-index: 5;
+            color: #4CAF50;
+        }
+        .key {
+            background-color: #333;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-weight: bold;
+            margin: 0 5px;
+        }
+        .enter {
+            background-color: #4CAF50;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="canvas"></canvas>
+
+    <!-- Start Screen -->
+    <div id="startScreen">
+        <h1>Ping Pong</h1>
+        <p>Use <span class="key">←</span> and <span class="key">→</span> to move the paddle</p>
+        <p>Keep the ball in play!</p>
+        <p><strong>Press <span class="key enter">ENTER</span> to start</strong></p>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="gameOverScreen" style="display: none;">
+        <h1>Game Over</h1>
+        <p>Your Score: <span id="finalScore">0</span></p>
+        <p><strong>Press <span class="key enter">ENTER</span> to play again</strong></p>
+    </div>
+
+    <!-- Live Score -->
+    <div id="scoreDisplay">Score: 0</div>
+
+    <script>
+        // Canvas setup
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const startScreen = document.getElementById('startScreen');
+        const gameOverScreen = document.getElementById('gameOverScreen');
+        const finalScoreDisplay = document.getElementById('finalScore');
+        const scoreDisplay = document.getElementById('scoreDisplay');
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // Game objects
+        const ball = {
+            x: 0, y: 0, radius: 15, vx: 5, vy: 5, color: 'white'
+        };
+
+        const paddle = {
+            width: 120, height: 15,
+            x: 0, y: 0,
+            speed: 12, color: '#4CAF50'
+        };
+
+        // Game state
+        let gameActive = false;
+        let gameStarted = false;
+        let score = 0;
+        let leftPressed = false;
+        let rightPressed = false;
+
+        // Reset functions
+        function resetBall() {
+            ball.x = canvas.width / 2;
+            ball.y = canvas.height / 2;
+            ball.vx = (Math.random() > 0.5 ? 1 : -1) * 5;
+            ball.vy = -5;
+        }
+
+        function resetPaddle() {
+            paddle.x = canvas.width / 2 - paddle.width / 2;
+            paddle.y = canvas.height - 60;
+        }
+
+        function updateScore() {
+            scoreDisplay.textContent = `Score: ${score}`;
+        }
+
+        // Start game
+        function startGame() {
+            gameStarted = true;
+            gameActive = true;
+            score = 0;
+            updateScore();
+            startScreen.style.display = 'none';
+            gameOverScreen.style.display = 'none';
+            resetBall();
+            resetPaddle();
+            animate();
+        }
+
+        // Game over
+        function gameOver() {
+            gameActive = false;
+            finalScoreDisplay.textContent = score;
+            gameOverScreen.style.display = 'flex';
+        }
+
+        // Keyboard controls
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft') leftPressed = true;
+            if (e.key === 'ArrowRight') rightPressed = true;
+
+            // Enter key to start or restart
+            if (e.key === 'Enter') {
+                if (!gameStarted || !gameActive) {
+                    startGame();
+                }
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if (e.key === 'ArrowLeft') leftPressed = false;
+            if (e.key === 'ArrowRight') rightPressed = false;
+        });
+
+        // Collision detection
+        function checkCollision() {
+            let bounced = false;
+
+            // Paddle hit
+            if (
+                ball.y + ball.radius > paddle.y &&
+                ball.x > paddle.x &&
+                ball.x < paddle.x + paddle.width &&
+                ball.y - ball.radius < paddle.y + paddle.height &&
+                ball.vy > 0 // Only count if ball is moving down
+            ) {
+                bounced = true;
+                const hitPos = (ball.x - (paddle.x + paddle.width / 2)) / (paddle.width / 2);
+                ball.vx = 7 * hitPos;
+                ball.vy = -Math.abs(ball.vy);
+                score++;
+                updateScore();
+            }
+
+            // Wall collisions
+            if (ball.x + ball.radius > canvas.width || ball.x - ball.radius < 0) {
+                ball.vx = -ball.vx * (0.9 + Math.random() * 0.2);
+            }
+            if (ball.y - ball.radius < 0) {
+                ball.vy = -ball.vy * (0.9 + Math.random() * 0.2);
+            }
+
+            // Bottom = Game Over
+            if (ball.y + ball.radius > canvas.height) {
+                gameOver();
+            }
+
+            return bounced;
+        }
+
+        // Animation loop
+        function animate() {
+            if (!gameActive) return;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Move paddle
+            if (leftPressed && paddle.x > 0) {
+                paddle.x -= paddle.speed;
+            }
+            if (rightPressed && paddle.x + paddle.width < canvas.width) {
+                paddle.x += paddle.speed;
+            }
+
+            // Update ball
+            ball.x += ball.vx;
+            ball.y += ball.vy;
+
+            // Check collisions
+            checkCollision();
+
+            // Draw paddle
+            ctx.fillStyle = paddle.color;
+            ctx.fillRect(paddle.x, paddle.y, paddle.width, paddle.height);
+
+            // Draw ball
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+            ctx.fillStyle = ball.color;
+            ctx.fill();
+            ctx.closePath();
+
+            requestAnimationFrame(animate);
+        }
+
+        // Handle resize
+        window.addEventListener('resize', () => {
+            if (gameActive) {
+                resetPaddle();
+            }
+        });
+
+        // Initial state: Show start screen
+        startScreen.style.display = 'flex';
+    </script>
+</body>
+</html>
 
